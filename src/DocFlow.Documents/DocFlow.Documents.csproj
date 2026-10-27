@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\DocFlow.Engine\DocFlow.Engine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="DocFlow.Engine" />
+    <Using Include="Microsoft.Extensions.DependencyInjection" />
+    <Using Include="Microsoft.Extensions.Logging" />
+    <Using Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+</Project>

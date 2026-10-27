@@ -1,0 +1,14 @@
+# Локальная PostgreSQL для разработки: docker compose up -d
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: docflow
+      POSTGRES_USER: docflow
+      POSTGRES_PASSWORD: docflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - docflow-pgdata:/var/lib/postgresql/data
+volumes:
+  docflow-pgdata:

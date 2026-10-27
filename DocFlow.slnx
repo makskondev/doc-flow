@@ -1,0 +1,18 @@
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="README.md" />
+    <File Path="docs/architecture.md" />
+    <File Path="docs/adding-a-document-type.md" />
+    <File Path="docs/operations.md" />
+    <File Path="docs/before-production.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/DocFlow.Engine/DocFlow.Engine.csproj" />
+    <Project Path="src/DocFlow.Documents/DocFlow.Documents.csproj" />
+    <Project Path="src/DocFlow.Data/DocFlow.Data.csproj" />
+    <Project Path="src/DocFlow.Host/DocFlow.Host.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DocFlow.Tests/DocFlow.Tests.csproj" />
+  </Folder>
+</Solution>

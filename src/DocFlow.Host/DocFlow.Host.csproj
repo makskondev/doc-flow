@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <!-- Нужен утилите dotnet ef: стартовый проект обязан ссылаться на Design -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DocFlow.Engine\DocFlow.Engine.csproj" />
+    <ProjectReference Include="..\DocFlow.Documents\DocFlow.Documents.csproj" />
+    <ProjectReference Include="..\DocFlow.Data\DocFlow.Data.csproj" />
+  </ItemGroup>
+</Project>
