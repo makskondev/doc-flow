@@ -1,9 +1,9 @@
 namespace DocFlow.Documents;
 
 /// <summary>
-/// Ждёт, когда в «директории результата подписания» типа документа появятся И подписанный файл ({processId}.pdf),
-/// И подпись ({processId}.sig). Оба файла должны быть готовы: размер и время записи не менялись между двумя сканами.
-/// Каталог у каждого типа свой (Storage:Types:{тип}:SignResultDir).
+/// Ждёт, когда в «директории результата подписания» типа документа появятся И подписанный файл, И подпись. Имена берутся
+/// из процесса (их запомнил SendToSignatureStep): файл называется как исходный, подпись — по соглашению Storage:SignatureNaming.
+/// Оба файла должны быть готовы: размер и время записи не менялись между двумя сканами. Каталог у каждого типа свой.
 /// </summary>
 public sealed class SigningResultScanner(
     IFileStorage fs,
@@ -39,12 +39,17 @@ public sealed class SigningResultScanner(
                 continue;
             }
 
-            var pdfs = await IndexAsync(directory, "*.pdf", ct);
-            var sigs = await IndexAsync(directory, "*.sig", ct);
+            // Один листинг на каталог; имена сравниваются без учёта регистра (SMB)
+            var files = new Dictionary<string, FileEntry>(StringComparer.OrdinalIgnoreCase);
+            foreach (var file in await fs.ListAsync(directory, "*", ct))
+                files[file.Name] = file;
 
             foreach (var process in group)
             {
-                if (!pdfs.TryGetValue(process.Id, out var pdf) || !sigs.TryGetValue(process.Id, out var sig)) continue;   // нужны оба файла
+                if (!process.Bag.TryGetValue(BagKeys.PdfPath, out var pdfPath)
+                    || !process.Bag.TryGetValue(BagKeys.SigPath, out var sigPath)) continue;
+                if (!files.TryGetValue(Path.GetFileName(pdfPath), out var pdf)
+                    || !files.TryGetValue(Path.GetFileName(sigPath), out var sig)) continue;   // нужны оба файла
 
                 var pdfSnapshot = (pdf.Size, pdf.LastWriteUtc);
                 var sigSnapshot = (sig.Size, sig.LastWriteUtc);
@@ -60,15 +65,5 @@ public sealed class SigningResultScanner(
             }
         }
         _seen = current;
-    }
-
-    // Файлы результата называются по Guid процесса; дубли имён (регистр) скан не роняют
-    private async Task<Dictionary<Guid, FileEntry>> IndexAsync(string directory, string pattern, CancellationToken ct)
-    {
-        var map = new Dictionary<Guid, FileEntry>();
-        foreach (var file in await fs.ListAsync(directory, pattern, ct))
-            if (Guid.TryParse(Path.GetFileNameWithoutExtension(file.Name), out var id))
-                map[id] = file;
-        return map;
     }
 }

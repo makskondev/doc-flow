@@ -24,14 +24,14 @@ public class ScenarioTests
         var parked = await h.GetAsync(id);
         Assert.Equal(ProcessStatus.Waiting, parked.Status);
         Assert.Equal(Signals.SigningResult, parked.WaitingFor);
-        var sent = h.Storage.SignInput("zop", id, ".pdf");
+        var sent = h.Storage.SignInput("zop", "z.pdf");      // исходное имя, без идентификатора
         Assert.True(h.Files.Has(sent));
         Assert.False(h.Files.Has(h.Storage.Work(id, ".pdf")));
 
         // «система подписи» кладёт в директорию результата файл и подпись
         var bytes = h.Files.Bytes(sent);
-        h.Files.Put(h.Storage.SignResult("zop", id, ".pdf"), bytes);
-        h.Files.Put(h.Storage.SignResult("zop", id, ".sig"), System.Text.Encoding.UTF8.GetBytes("SIG:" + Hashing.Sha256Hex(bytes)));
+        h.Files.Put(h.Storage.SignResultFile("zop", "z.pdf"), bytes);
+        h.Files.Put(h.Storage.SignResultSignature("zop", "z.pdf"), System.Text.Encoding.UTF8.GetBytes("SIG:" + Hashing.Sha256Hex(bytes)));
 
         await h.Scanner.ScanAsync(CancellationToken.None);     // первый скан: файлы ещё могли дописываться
         Assert.Equal(ProcessStatus.Waiting, (await h.GetAsync(id)).Status);
@@ -53,7 +53,7 @@ public class ScenarioTests
         var id = await h.RegisterAsync(new DocumentCandidate(SourceIds.View1, "9", "/src/z.pdf", Zop()));
         await h.AdvanceAsync(id);
 
-        h.Files.Put(h.Storage.SignResult("zop", id, ".sig"), "SIG:whatever");
+        h.Files.Put(h.Storage.SignResultSignature("zop", "z.pdf"), "SIG:whatever");
         await h.Scanner.ScanAsync(CancellationToken.None);
         await h.Scanner.ScanAsync(CancellationToken.None);
 
@@ -162,5 +162,86 @@ public class ScenarioTests
         var p = await h.GetAsync(id);
         Assert.Equal(ProcessStatus.NeedsAttention, p.Status);
         Assert.Contains("SearchDir", p.AttentionReason);
+    }
+
+    // ---- имена файлов: пользователи видят исходные имена ----
+
+    private static async Task<(ScenarioHarness H, Guid Id)> ZopWaitingForSignatureAsync(Action<ScenarioHarness>? arrange = null)
+    {
+        var h = new ScenarioHarness();
+        arrange?.Invoke(h);
+        h.Files.Put("/src/z.pdf", ScenarioHarness.Pdf("zop"));
+        var id = await h.RegisterAsync(new DocumentCandidate(SourceIds.View1, "9", "/src/z.pdf", Zop()));
+        await h.AdvanceAsync(id);
+        return (h, id);
+    }
+
+    private static async Task SignAsync(ScenarioHarness h, byte[] signedBytes)
+    {
+        // «система подписания» забирает файл из папки для подписи и кладёт результат в директорию результата
+        await h.Files.DeleteAsync(h.Storage.SignInput("zop", "z.pdf"), CancellationToken.None);
+        h.Files.Put(h.Storage.SignResultFile("zop", "z.pdf"), signedBytes);
+        h.Files.Put(h.Storage.SignResultSignature("zop", "z.pdf"),
+            System.Text.Encoding.UTF8.GetBytes("SIG:" + Hashing.Sha256Hex(signedBytes)));
+        await h.Scanner.ScanAsync(CancellationToken.None);
+        await h.Scanner.ScanAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Users_see_original_file_names_in_every_user_facing_directory()
+    {
+        var (h, id) = await ZopWaitingForSignatureAsync();
+        Assert.Equal(new[] { "/zop/in/z.pdf" }, h.Files.All().Where(f => f.StartsWith("/zop/")));   // в папке для подписи — исходное имя
+
+        await SignAsync(h, h.Files.Bytes("/zop/in/z.pdf"));
+        await h.AdvanceAsync(id);
+
+        Assert.Equal(ProcessStatus.Completed, (await h.GetAsync(id)).Status);
+        Assert.Equal(new[] { "/zop/final/z.pdf", "/zop/final/z.pdf.sig" }, h.Files.All().Where(f => f.StartsWith("/zop/")));
+        Assert.DoesNotContain(h.Files.All(), f => f.Contains(id.ToString()));           // идентификатор процесса нигде не виден
+    }
+
+    [Fact]
+    public async Task Signature_file_name_follows_the_configured_convention()
+    {
+        var (h, id) = await ZopWaitingForSignatureAsync(x => x.Storage.SignatureNaming = SignatureNaming.ReplaceExtension);
+
+        await SignAsync(h, h.Files.Bytes("/zop/in/z.pdf"));    // подпись ложится как «z.sig»
+        Assert.True(h.Files.Has("/zop/out/z.sig"));
+        await h.AdvanceAsync(id);
+
+        Assert.Equal(ProcessStatus.Completed, (await h.GetAsync(id)).Status);
+        Assert.True(h.Files.Has("/zop/final/z.pdf"));
+        Assert.True(h.Files.Has("/zop/final/z.sig"));
+    }
+
+    [Fact]
+    public async Task Another_document_with_the_same_name_already_waiting_for_signature_is_not_overwritten()
+    {
+        var h = new ScenarioHarness();
+        h.Files.Put("/zop/in/z.pdf", ScenarioHarness.Pdf("другой документ, ждёт подписи"));
+        h.Files.Put("/src/z.pdf", ScenarioHarness.Pdf("zop"));
+        var id = await h.RegisterAsync(new DocumentCandidate(SourceIds.View1, "9", "/src/z.pdf", Zop()));
+
+        await h.AdvanceAsync(id);
+
+        var p = await h.GetAsync(id);
+        Assert.Equal(ProcessStatus.NeedsAttention, p.Status);
+        Assert.Contains("другой файл", p.AttentionReason);
+        Assert.Equal(ScenarioHarness.Pdf("другой документ, ждёт подписи"), h.Files.Text("/zop/in/z.pdf"));
+    }
+
+    [Fact]
+    public async Task A_stale_result_with_the_same_name_but_different_content_fails_verification()
+    {
+        var (h, id) = await ZopWaitingForSignatureAsync();
+
+        // в директории результата лежит «чужой» файл с тем же именем и своей валидной подписью
+        await SignAsync(h, System.Text.Encoding.UTF8.GetBytes(ScenarioHarness.Pdf("устаревший результат")));
+        await h.AdvanceAsync(id);
+
+        var p = await h.GetAsync(id);
+        Assert.Equal(ProcessStatus.NeedsAttention, p.Status);
+        Assert.Contains("отличается", p.AttentionReason);
     }
 }

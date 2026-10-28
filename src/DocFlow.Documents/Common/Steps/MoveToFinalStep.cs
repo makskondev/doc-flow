@@ -2,7 +2,8 @@ namespace DocFlow.Documents;
 
 /// <summary>
 /// Переложить файл (и подпись, если она есть) в конечный каталог типа документа и убрать рабочие копии.
-/// Файл сохраняет исходное имя, подпись получает имя «имя.pdf.sig». Повтор безопасен; чужой файл с тем же именем — эскалация.
+/// Файл сохраняет исходное имя, подпись называется по соглашению Storage:SignatureNaming (по умолчанию «имя.pdf.sig»).
+/// Повтор безопасен; другой файл с тем же именем в конечном каталоге не перезаписывается — эскалация.
 /// </summary>
 public sealed class MoveToFinalStep(IFileStorage fs, IOptions<StorageOptions> storage) : IStep
 {
@@ -18,7 +19,7 @@ public sealed class MoveToFinalStep(IFileStorage fs, IOptions<StorageOptions> st
 
         if (ctx.Bag.TryGetValue(BagKeys.SigPath, out var sigPath))
         {
-            var sigTarget = s.Final(type, name + ".sig");
+            var sigTarget = s.FinalSignature(type, name);
             await fs.MoveIdempotentAsync(sigPath, sigTarget, overwriteDifferent: false, ct);
             ctx.Bag[BagKeys.SigPath] = sigTarget;
         }

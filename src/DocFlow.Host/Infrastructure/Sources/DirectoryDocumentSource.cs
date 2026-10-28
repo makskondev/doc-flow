@@ -45,9 +45,13 @@ public sealed class DirectoryDocumentSource(IFileStorage fs, IOptions<IntakeOpti
     {
         if (string.IsNullOrEmpty(process.ContentPath) || !await fs.ExistsAsync(process.ContentPath, ct)) return;   // уже забрали
 
-        var directory = System.IO.Path.GetDirectoryName(process.ContentPath)!;
-        var name = System.IO.Path.GetFileNameWithoutExtension(process.ContentPath);
-        await fs.MoveAsync(process.ContentPath,
-            System.IO.Path.Combine(directory, "_processed", $"{name}.{process.Id}.pdf"), overwrite: true, ct);
+        // Оригинал уходит в _processed под ИСХОДНЫМ именем; если такое имя там уже занято — к нему добавляется идентификатор процесса
+        var archive = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(process.ContentPath)!, "_processed");
+        var target = System.IO.Path.Combine(archive, System.IO.Path.GetFileName(process.ContentPath));
+        if (await fs.ExistsAsync(target, ct))
+            target = System.IO.Path.Combine(archive,
+                $"{System.IO.Path.GetFileNameWithoutExtension(process.ContentPath)}.{process.Id:N}{System.IO.Path.GetExtension(process.ContentPath)}");
+
+        await fs.MoveAsync(process.ContentPath, target, overwrite: true, ct);
     }
 }

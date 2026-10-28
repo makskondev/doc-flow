@@ -6,7 +6,7 @@ public sealed class TypeDirectories
     /// <summary>«Папка для проставления подписи»: сюда шаг SendToSignatureStep перекладывает файл.</summary>
     public string? SignInputDir { get; set; }
 
-    /// <summary>«Директория результата подписания»: здесь появляются подписанный файл ({id}.pdf) и подпись ({id}.sig).</summary>
+    /// <summary>«Директория результата подписания»: здесь появляются подписанный файл (под исходным именем) и подпись (по соглашению Storage:SignatureNaming).</summary>
     public string? SignResultDir { get; set; }
 
     /// <summary>Конечный каталог, куда в конце перекладывается файл.</summary>

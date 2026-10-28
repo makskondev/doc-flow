@@ -7,7 +7,7 @@
 | `ConnectionStrings:DocFlow` | подключение к PostgreSQL. В окружении — переменная `ConnectionStrings__DocFlow` или user secrets |
 | `Database:MigrateOnStartup` | применять миграции при старте (выключите, если миграции накатывает отдельный процесс деплоя) |
 | `Engine` | интервалы опроса источников/сигналов/раннера, число попыток и задержка повтора, параллелизм |
-| `Storage` | `WorkingDir` и каталоги по типам документов: `Types:<тип>` → `SignInputDir`, `SignResultDir`, `FinalDir`, `SearchDir` |
+| `Storage` | `WorkingDir`, `SignatureNaming` (имя подписи: `AppendSuffix` / `ReplaceExtension`) и каталоги по типам документов: `Types:<тип>` → `SignInputDir`, `SignResultDir`, `FinalDir`, `SearchDir` |
 | `Intake:Directories` | каталоги приёма: `Name` (логическое имя), `Path`, `Mask`. Тип документа определяют правила `Matches` маршрутов |
 
 ## База данных и миграции
